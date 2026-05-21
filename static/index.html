@@ -3,83 +3,132 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Notepad</title>
+<title>go-notepad</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;height:100vh;display:flex;flex-direction:column}
-.toolbar{padding:4px 8px;border-bottom:1px solid #eee;display:flex;gap:2px;flex-wrap:wrap}
-.btn{padding:2px 8px;font-size:12px;border:1px solid #ddd;background:#fafafa;cursor:pointer;border-radius:2px}
-.btn:hover{background:#f0f0f0}
-.editor{flex:1;padding:12px;width:100%;border:none;outline:none;resize:none;font-size:15px;line-height:1.6}
+body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#333}
+#list-page,#edit-page{display:none;height:100vh}
+
+/* 列表页 */
+.list-page{display:block}
+.list-wrap{max-width:500px;margin:0 auto;padding:16px}
+.list-title{font-size:18px;font-weight:bold;padding:16px 0;border-bottom:1px solid #eee}
+.note-link{display:block;padding:12px;border:1px solid #e0e0e0;border-radius:6px;margin:8px 0;color:#333;text-decoration:none}
+.note-link:hover{background:#f8f8f8}
+.note-link h3{font-size:15px}
+.note-link p{font-size:12px;color:#999;margin-top:4px}
+.new-note{margin-top:16px}
+.new-note input{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-bottom:8px}
+.new-note button{width:100%;padding:10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer}
+
+/* 编辑页 */
+.edit-page{display:flex;flex-direction:column}
+.toolbar{padding:6px 8px;display:flex;gap:4px;background:#f8f8f8;border-bottom:1px solid #eee;flex-wrap:wrap}
+.btn{padding:4px 10px;font-size:12px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:4px}
+.btn:hover{background:#eee}
+.back{background:#eee;border:none}
+.editor{flex:1;padding:16px;outline:none;font-size:15px;line-height:1.8;overflow-y:auto}
+.editor:empty:before{content:attr(data-placeholder);color:#bbb}
 </style>
 </head>
 <body>
-<div class="toolbar">
-<button class="btn" data-md="**" title="加粗">B</button>
-<button class="btn" data-md="#" title="一级标题">H1</button>
-<button class="btn" data-md="###" title="三级标题">H3</button>
-<button class="btn" data-md="-" title="无序列表">-</button>
-<button class="btn" data-md="1." title="有序列表">1.</button>
-<button class="btn" data-md=">" title="引用">引用</button>
-<button class="btn" data-md="`" title="行内代码">代码</button>
-<button class="btn" data-md="---" title="分割线">---</button>
-</div>
-<textarea class="editor" id="editor" placeholder="开始输入..."></textarea>
-<script>
-let timer;
-const editor=document.getElementById('editor');
-editor.value='';
 
-function load(){
-  fetch('/load').then(r=>r.text()).then(t=>editor.value=t);
+<div id="list-page" class="list-page">
+  <div class="list-wrap">
+    <h1 class="list-title">📝 记事本</h1>
+    <div id="note-list"></div>
+    <div class="new-note">
+      <input id="note-name" placeholder="新记事本名称">
+      <button onclick="createNote()">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-page">
+  <div class="toolbar">
+    <button class="btn back" onclick="showList()">←</button>
+    <button class="btn" onclick="format('bold')"><b>B</b></button>
+    <button class="btn" onclick="formatLine('h1')">H1</button>
+    <button class="btn" onclick="formatLine('h3')">H3</button>
+    <button class="btn" onclick="formatLine('ul')">—</button>
+    <button class="btn" onclick="formatLine('ol')">1.</button>
+    <button class="btn" onclick="formatLine('quote')">></button>
+    <button class="btn" onclick="format('code')"><></button>
+    <button class="btn" onclick="insertHr()">—</button>
+  </div>
+  <div id="editor" class="editor" contenteditable="true" data-placeholder="开始输入..."></div>
+</div>
+
+<script>
+let current='';
+let timer;
+
+function $(id){return document.getElementById(id)}
+
+function showList(){
+  $('list-page').className='list-page';
+  $('edit-page').style.display='none';
+  fetch('/list').then(r=>r.json()).then(notes=>{
+    if(notes.length===0){
+      $('note-list').innerHTML='<p style="color:#999;text-align:center;padding:24px">暂无记事本</p>';
+    }else{
+      $('note-list').innerHTML=notes.map(n=>`<a class="note-link" href="javascript:openNote('${n.name}')"><h3>${n.name}</h3><p>点击打开</p></a>`).join('');
+    }
+  });
+}
+
+function openNote(name){
+  current=name;
+  $('list-page').className='';
+  $('edit-page').style.display='flex';
+  $('editor').innerHTML='';
+  fetch('/load?name='+encodeURIComponent(name)).then(r=>r.text()).then(t=>{
+    if(t)$('editor').innerHTML=t.split('\n').map(l=>`<div>${l||'<br>'}</div>`).join('');
+    else $('editor').innerHTML='<div><br></div>';
+  });
+}
+
+function createNote(){
+  const name=$('note-name').value.trim();
+  if(!name)return alert('请输入名称');
+  fetch('/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'name='+encodeURIComponent(name)+'&content='}).then(()=>{
+    $('note-name').value='';
+    openNote(name);
+  });
 }
 
 function save(){
   clearTimeout(timer);
   timer=setTimeout(()=>{
-    fetch('/save',{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'content='+encodeURIComponent(editor.value)
-    });
+    const lines=Array.from($('editor').childNodes).map(n=>n.textContent||'').join('\n');
+    fetch('/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'name='+encodeURIComponent(current)+'&content='+encodeURIComponent(lines)});
   },500);
 }
 
-document.querySelectorAll('.btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const md=btn.dataset.md;
-    const start=editor.selectionStart;
-    const end=editor.selectionEnd;
-    const text=editor.value;
-    const selected=text.substring(start,end);
-    let insert;
-    if(selected){
-      if(md==='**'||md==='`'){
-        insert=md+selected+md;
-        editor.setRangeText(insert,start,end,'end');
-      }else{
-        insert=md+' '+selected;
-        editor.setRangeText(insert,start,end,'end');
-      }
-    }else{
-      if(md==='**'||md==='`'){
-        insert=md+'文本'+md;
-        editor.setRangeText(insert,start,start,'end');
-      }else if(md==='---'){
-        insert='\n---\n';
-        editor.setRangeText(insert,start,start,'end');
-      }else{
-        insert=md+' ';
-        editor.setRangeText(insert,start,start,'end');
-      }
-    }
-    editor.focus();
-    save();
-  });
+function format(cmd){
+  document.execCommand(cmd,false);
+  save();
+}
+
+function formatLine(tag){
+  const s=window.getSelection();
+  if(!s.toString())return;
+  document.execCommand('insertHTML',false,`<${tag}>`+s.toString()+`</${tag}>`);
+  save();
+}
+
+function insertHr(){
+  document.execCommand('insertHTML',false,'<hr>');
+  save();
+}
+
+$('editor').addEventListener('input',save);
+$('editor').addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();document.execCommand('insertHTML',false,'    ');}
+  if(e.key==='Enter')document.execCommand('defaultParagraphSeparator',false,'div');
 });
 
-editor.addEventListener('input',save);
-window.addEventListener('load',load);
+showList();
 </script>
 </body>
 </html>
