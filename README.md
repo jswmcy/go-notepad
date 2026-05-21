@@ -7,11 +7,7 @@
 
 ### Docker部署
 ```bash
-docker run -d \
-  -p 3000:3000 \
-  -v $(pwd)/data:/app/data \
-  --restart always \
-  zenbox01/go-notepad
+docker run -d --name go-notepad -p 3000:3000 -v $(pwd)/data:/app/data --restart always zenbox01/go-notepad
 ```
 
 ### 二进制部署
