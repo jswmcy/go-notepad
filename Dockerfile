@@ -1,7 +1,7 @@
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -trimpath" -o go-notepad .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o go-notepad .
 
 FROM scratch
 WORKDIR /app
