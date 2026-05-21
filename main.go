@@ -22,22 +22,17 @@ type Note struct {
 
 func main() {
 	os.MkdirAll(dataDir, 0755)
-
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/list", listHandler)
 	http.HandleFunc("/load", loadHandler)
 	http.HandleFunc("/save", saveHandler)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-
 	fmt.Printf("go-notepad running on http://localhost%s\n", port)
 	http.ListenAndServe(port, nil)
 }
 
+// 所有路径都返回首页，由前端根据路径判断打开哪个笔记本
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
 	http.ServeFile(w, r, "static/index.html")
 }
 
@@ -84,6 +79,4 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-func _() {
-	_ = io.EOF
-}
+func _() { _ = io.EOF }
