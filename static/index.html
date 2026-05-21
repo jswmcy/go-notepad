@@ -21,6 +21,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
 .note-name-bar{padding:6px 12px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px}
 .note-name-bar a{color:#666;text-decoration:none;font-size:13px}
 .note-name-bar span{font-weight:bold;font-size:14px}
+
+/* 渲染样式 */
+.editor h1{font-size:22px;font-weight:bold;margin:12px 0 8px}
+.editor h2{font-size:19px;font-weight:bold;margin:10px 0 6px}
+.editor h3{font-size:17px;font-weight:bold;margin:10px 0 6px}
+.editor blockquote{border-left:4px solid #ddd;padding:4px 12px;color:#666;margin:8px 0;background:#fafafa}
+.editor code{background:#f5f5f5;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:13px}
+.editor pre{background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:12px;font-family:monospace;font-size:13px;line-height:1.5;overflow-x:auto;margin:8px 0;white-space:pre-wrap}
+.editor pre code{background:none;padding:0;border-radius:0;font-size:inherit}
+.editor hr{border:none;border-top:2px solid #eee;margin:16px 0}
+.editor ul,.editor ol{margin:8px 0;padding-left:20px}
+.editor li{margin:3px 0}
+.editor em,.editor i{font-style:italic}
+.editor strong,.editor b{font-weight:bold}
 </style>
 </head>
 <body>
@@ -32,14 +46,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
     <span id="note-title"></span>
   </div>
   <div class="toolbar">
-    <button class="btn" onclick="doBold()"><b>B</b></button>
-    <button class="btn" onclick="doH1()">H1</button>
-    <button class="btn" onclick="doH3()">H3</button>
-    <button class="btn" onclick="doUl()">—</button>
-    <button class="btn" onclick="doOl()">1.</button>
-    <button class="btn" onclick="doQuote()">></button>
-    <button class="btn" onclick="doCode()"><></button>
-    <button class="btn" onclick="doHr()">—</button>
+    <button class="btn" onclick="doBold()" title="加粗"><b>B</b></button>
+    <button class="btn" onclick="doH1()" title="一级标题">H1</button>
+    <button class="btn" onclick="doH3()" title="三级标题">H3</button>
+    <button class="btn" onclick="doUl()" title="无序列表">—</button>
+    <button class="btn" onclick="doOl()" title="有序列表">1.</button>
+    <button class="btn" onclick="doQuote()" title="引用">></button>
+    <button class="btn" onclick="doCode()" title="代码块"><></button>
+    <button class="btn" onclick="doHr()" title="分割线">—</button>
     <span id="status" class="status" style="opacity:0"></span>
   </div>
   <div class="editor-wrap"><div id="editor" class="editor" contenteditable="true"></div></div>
@@ -50,26 +64,133 @@ var currentNote = '';
 var saveTimer = null;
 var statusTimer = null;
 
-// 从 URL 路径获取笔记本名称
 function getNoteName() {
   var path = window.location.pathname;
   if (path === '/' || path === '') return 'default';
   return decodeURIComponent(path.replace(/^\//, ''));
 }
 
-// 显示状态
 function showStatus(type, text) {
   var el = document.getElementById('status');
   el.className = 'status ' + type;
   el.textContent = text;
   el.style.opacity = '1';
   if (statusTimer) clearTimeout(statusTimer);
-  if (type === 'ok') {
-    statusTimer = setTimeout(function() { el.style.opacity = '0'; }, 2000);
-  }
+  if (type === 'ok') statusTimer = setTimeout(function() { el.style.opacity = '0'; }, 2000);
 }
 
-// 打开笔记本
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ========== MD 文本 → HTML 渲染 ==========
+// 支持语法：# ## ### 标题、**加粗__加粗、*斜体_斜体、~~删除线~~
+//          `行内代码`、```代码块```、> 引用、--- 分割线、- 无序列表、1. 有序列表
+
+function mdToHtml(text) {
+  var lines = text.split('\n');
+  var html = '';
+  var inCodeBlock = false;
+  var codeBuf = [];
+  var inList = false;
+  var listType = '';
+  var listBuf = [];
+
+  function flushList() {
+    if (inList && listBuf.length > 0) {
+      html += '<' + listType + '>' + listBuf.join('') + '</' + listType + '>';
+      listBuf = [];
+      inList = false;
+    }
+  }
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    // 代码块
+    if (line.trim() === '```') {
+      flushList();
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBuf = [];
+      } else {
+        inCodeBlock = false;
+        html += '<pre><code>' + escHtml(codeBuf.join('\n')) + '</code></pre>';
+      }
+      continue;
+    }
+    if (inCodeBlock) { codeBuf.push(line); continue; }
+
+    // 空行
+    if (line === '') {
+      flushList();
+      html += '<div><br></div>';
+      continue;
+    }
+
+    // 分割线
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      flushList();
+      html += '<hr>';
+      continue;
+    }
+
+    // 标题
+    var hMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (hMatch) {
+      flushList();
+      var tag = 'h' + hMatch[1].length;
+      html += '<' + tag + '>' + renderInline(hMatch[2]) + '</' + tag + '>';
+      continue;
+    }
+
+    // 引用
+    if (line.startsWith('>')) {
+      flushList();
+      html += '<blockquote>' + renderInline(line.replace(/^>\s*/, '')) + '</blockquote>';
+      continue;
+    }
+
+    // 无序列表
+    if (/^[\s]*[-*+]\s/.test(line)) {
+      if (!inList || listType !== 'ul') { flushList(); inList = true; listType = 'ul'; }
+      listBuf.push('<li>' + renderInline(line.replace(/^[\s]*[-*+]\s/, '')) + '</li>');
+      continue;
+    }
+
+    // 有序列表
+    if (/^[\s]*\d+\.\s/.test(line)) {
+      if (!inList || listType !== 'ol') { flushList(); inList = true; listType = 'ol'; }
+      listBuf.push('<li>' + renderInline(line.replace(/^[\s]*\d+\.\s/, '')) + '</li>');
+      continue;
+    }
+
+    // 普通段落
+    flushList();
+    html += '<div>' + renderInline(line) + '</div>';
+  }
+
+  flushList();
+  if (inCodeBlock && codeBuf.length > 0) {
+    html += '<pre><code>' + escHtml(codeBuf.join('\n')) + '</code></pre>';
+  }
+  return html;
+}
+
+// 行内渲染：加粗、斜体、删除线、行内代码
+function renderInline(text) {
+  // 行内代码 `...`
+  text = text.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // 删除线 ~~...~~
+  text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+  // 加粗 **...** 或 __...__
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  // 斜体 *...* 或 _..._
+  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+  return text;
+}
+
+// ========== 加载笔记 ==========
 function openNote(name) {
   currentNote = name;
   document.getElementById('note-title').textContent = name;
@@ -78,69 +199,71 @@ function openNote(name) {
   fetch('/load?name=' + encodeURIComponent(name))
     .then(function(r) { return r.text(); })
     .then(function(text) {
-      if (text) {
-        var lines = text.split('\n');
-        var html = '';
-        for (var i = 0; i < lines.length; i++) {
-          if (lines[i] === '') {
-            html += '<div><br></div>';
-          } else {
-            html += '<div>' + escHtml(lines[i]) + '</div>';
-          }
-        }
-        editor.innerHTML = html;
-      } else {
-        editor.innerHTML = '<div><br></div>';
-      }
+      editor.innerHTML = text ? mdToHtml(text) : '<div><br></div>';
     });
 }
 
-// ---- 保存 ----
+// ========== 保存 ==========
 function doSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(function() {
     showStatus('saving', '保存中...');
     var editor = document.getElementById('editor');
-    var divs = editor.querySelectorAll('div');
-    var text = [];
-    for (var i = 0; i < divs.length; i++) {
-      text.push(divs[i].textContent);
+    var nodes = editor.querySelectorAll('div,pre,h1,h2,h3,blockquote,hr,ul,ol');
+    var lines = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      switch (n.tagName) {
+        case 'PRE':
+          lines.push('```');
+          var codeEl = n.querySelector('code');
+          lines.push(codeEl ? codeEl.textContent : n.textContent);
+          lines.push('```');
+          break;
+        case 'HR': break;
+        case 'H1': lines.push('# ' + n.textContent); break;
+        case 'H2': lines.push('## ' + n.textContent); break;
+        case 'H3': lines.push('### ' + n.textContent); break;
+        case 'BLOCKQUOTE': lines.push('> ' + n.textContent); break;
+        default:
+          lines.push(n.textContent);
+      }
     }
     fetch('/save', {
       method: 'POST',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: 'name=' + encodeURIComponent(currentNote) + '&content=' + encodeURIComponent(text.join('\n'))
+      body: 'name=' + encodeURIComponent(currentNote) + '&content=' + encodeURIComponent(lines.join('\n'))
     })
     .then(function(r) {
-      if (r.ok) {
-        showStatus('ok', '✓ 保存成功');
-      } else {
-        showStatus('err', '✗ 保存失败: ' + r.status);
-      }
+      if (r.ok) showStatus('ok', '✓ 保存成功');
+      else showStatus('err', '✗ 保存失败: ' + r.status);
     })
-    .catch(function() {
-      showStatus('err', '✗ 保存失败');
-    });
+    .catch(function() { showStatus('err', '✗ 保存失败'); });
   }, 500);
 }
 
-// ---- 格式化按钮 ----
+// ========== 格式化按钮 ==========
 function doBold() { document.execCommand('bold', false, null); doSave(); }
+
 function doCode() {
   var sel = window.getSelection().toString();
-  document.execCommand('insertHTML', false, sel ? '<code>' + sel + '</code>' : '<code>代码</code>');
+  if (sel && sel.indexOf('\n') !== -1)
+    document.execCommand('insertHTML', false, '<pre><code>' + escHtml(sel) + '</code></pre>');
+  else
+    document.execCommand('insertHTML', false, '<code>' + (sel || '代码') + '</code>');
   doSave();
 }
+
 function doHr() { document.execCommand('insertHTML', false, '<hr>'); doSave(); }
-function doH1() { wrapSelection('<h1>', '</h1>'); }
-function doH3() { wrapSelection('<h3>', '</h3>'); }
+function doH1() { wrapSel('<h1>', '</h1>'); }
+function doH3() { wrapSel('<h3>', '</h3>'); }
 function doUl() { insertLine('• '); }
 function doOl() { insertLine('1. '); }
 function doQuote() { insertLine('> '); }
 
-function wrapSelection(tagOpen, tagClose) {
+function wrapSel(open, close) {
   var sel = window.getSelection().toString() || '文本';
-  document.execCommand('insertHTML', false, tagOpen + sel + tagClose);
+  document.execCommand('insertHTML', false, open + sel + close);
   doSave();
 }
 
@@ -150,18 +273,38 @@ function insertLine(prefix) {
   doSave();
 }
 
-// ---- 工具函数 ----
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// ========== 粘贴事件：MD 渲染 ==========
+document.getElementById('editor').addEventListener('paste', function(e) {
+  e.preventDefault();
+  var text = e.clipboardData.getData('text/plain') || '';
+  if (!text) return;
 
-// ---- 事件绑定 ----
+  // 将 MD 文本转为 HTML 后插入
+  var sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    var range = sel.getRangeAt(0);
+    range.deleteContents();
+    var div = document.createElement('div');
+    div.innerHTML = mdToHtml(text);
+
+    // 将渲染后的节点逐个插入
+    var frag = document.createDocumentFragment();
+    while (div.firstChild) frag.appendChild(div.firstChild);
+    range.insertNode(frag);
+
+    // 光标移到末尾
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  doSave();
+});
+
 document.getElementById('editor').addEventListener('input', doSave);
 document.getElementById('editor').addEventListener('keydown', function(e) {
   if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
 });
 
-// ---- 初始化 ----
 openNote(getNoteName());
 </script>
 </body>
