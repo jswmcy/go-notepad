@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notepad</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;height:100vh;display:flex;flex-direction:column}
+.toolbar{padding:4px 8px;border-bottom:1px solid #eee;display:flex;gap:2px;flex-wrap:wrap}
+.btn{padding:2px 8px;font-size:12px;border:1px solid #ddd;background:#fafafa;cursor:pointer;border-radius:2px}
+.btn:hover{background:#f0f0f0}
+.editor{flex:1;padding:12px;width:100%;border:none;outline:none;resize:none;font-size:15px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="toolbar">
+<button class="btn" data-md="**" title="加粗">B</button>
+<button class="btn" data-md="#" title="一级标题">H1</button>
+<button class="btn" data-md="###" title="三级标题">H3</button>
+<button class="btn" data-md="-" title="无序列表">-</button>
+<button class="btn" data-md="1." title="有序列表">1.</button>
+<button class="btn" data-md=">" title="引用">引用</button>
+<button class="btn" data-md="`" title="行内代码">代码</button>
+<button class="btn" data-md="---" title="分割线">---</button>
+</div>
+<textarea class="editor" id="editor" placeholder="开始输入..."></textarea>
+<script>
+let timer;
+const editor=document.getElementById('editor');
+editor.value='';
+
+function load(){
+  fetch('/load').then(r=>r.text()).then(t=>editor.value=t);
+}
+
+function save(){
+  clearTimeout(timer);
+  timer=setTimeout(()=>{
+    fetch('/save',{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'content='+encodeURIComponent(editor.value)
+    });
+  },500);
+}
+
+document.querySelectorAll('.btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const md=btn.dataset.md;
+    const start=editor.selectionStart;
+    const end=editor.selectionEnd;
+    const text=editor.value;
+    const selected=text.substring(start,end);
+    let insert;
+    if(selected){
+      if(md==='**'||md==='`'){
+        insert=md+selected+md;
+        editor.setRangeText(insert,start,end,'end');
+      }else{
+        insert=md+' '+selected;
+        editor.setRangeText(insert,start,end,'end');
+      }
+    }else{
+      if(md==='**'||md==='`'){
+        insert=md+'文本'+md;
+        editor.setRangeText(insert,start,start,'end');
+      }else if(md==='---'){
+        insert='\n---\n';
+        editor.setRangeText(insert,start,start,'end');
+      }else{
+        insert=md+' ';
+        editor.setRangeText(insert,start,start,'end');
+      }
+    }
+    editor.focus();
+    save();
+  });
+});
+
+editor.addEventListener('input',save);
+window.addEventListener('load',load);
+</script>
+</body>
+</html>
