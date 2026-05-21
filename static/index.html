@@ -9,10 +9,13 @@
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#333}
 
 #edit-page{height:100vh;display:flex;flex-direction:column}
-.toolbar{padding:6px 10px;display:flex;gap:4px;flex-wrap:wrap;background:#fafafa;border-bottom:1px solid #eee}
+.toolbar{padding:6px 10px;display:flex;gap:4px;flex-wrap:wrap;background:#fafafa;border-bottom:1px solid #eee;align-items:center}
 .btn{padding:4px 12px;font-size:13px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:3px;min-width:32px;text-align:center}
 .btn:hover{background:#eee}
-.back-btn{background:#f0f0f0;border-color:#ddd}
+.status{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:3px;transition:opacity .3s}
+.status.saving{color:#666;background:#f0f0f0}
+.status.ok{color:#2d7d46;background:#e8f5e9}
+.status.err{color:#c62828;background:#ffebee}
 .editor-wrap{flex:1;overflow-y:auto}
 .editor{min-height:100%;padding:16px;outline:none;font-size:15px;line-height:1.8}
 .note-name-bar{padding:6px 12px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px}
@@ -37,6 +40,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
     <button class="btn" onclick="doQuote()">></button>
     <button class="btn" onclick="doCode()"><></button>
     <button class="btn" onclick="doHr()">—</button>
+    <span id="status" class="status" style="opacity:0"></span>
   </div>
   <div class="editor-wrap"><div id="editor" class="editor" contenteditable="true"></div></div>
 </div>
@@ -44,15 +48,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
 <script>
 var currentNote = '';
 var saveTimer = null;
+var statusTimer = null;
 
 // 从 URL 路径获取笔记本名称
 function getNoteName() {
   var path = window.location.pathname;
   if (path === '/' || path === '') return 'default';
-  // 去掉开头的 /
-  var name = path.replace(/^\//, '');
-  if (name === '') return 'default';
-  return decodeURIComponent(name);
+  return decodeURIComponent(path.replace(/^\//, ''));
+}
+
+// 显示状态
+function showStatus(type, text) {
+  var el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.textContent = text;
+  el.style.opacity = '1';
+  if (statusTimer) clearTimeout(statusTimer);
+  if (type === 'ok') {
+    statusTimer = setTimeout(function() { el.style.opacity = '0'; }, 2000);
+  }
 }
 
 // 打开笔记本
@@ -85,6 +99,7 @@ function openNote(name) {
 function doSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(function() {
+    showStatus('saving', '保存中...');
     var editor = document.getElementById('editor');
     var divs = editor.querySelectorAll('div');
     var text = [];
@@ -95,6 +110,16 @@ function doSave() {
       method: 'POST',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: 'name=' + encodeURIComponent(currentNote) + '&content=' + encodeURIComponent(text.join('\n'))
+    })
+    .then(function(r) {
+      if (r.ok) {
+        showStatus('ok', '✓ 保存成功');
+      } else {
+        showStatus('err', '✗ 保存失败: ' + r.status);
+      }
+    })
+    .catch(function() {
+      showStatus('err', '✗ 保存失败');
     });
   }, 500);
 }
@@ -109,24 +134,26 @@ function doCode() {
 function doHr() { document.execCommand('insertHTML', false, '<hr>'); doSave(); }
 function doH1() { wrapSelection('<h1>', '</h1>'); }
 function doH3() { wrapSelection('<h3>', '</h3>'); }
-function doUl() { insertLine('\u2022 '); }
+function doUl() { insertLine('• '); }
 function doOl() { insertLine('1. '); }
 function doQuote() { insertLine('> '); }
 
 function wrapSelection(tagOpen, tagClose) {
-  var sel = window.getSelection().toString() || '\u6587\u672C';
+  var sel = window.getSelection().toString() || '文本';
   document.execCommand('insertHTML', false, tagOpen + sel + tagClose);
   doSave();
 }
 
 function insertLine(prefix) {
-  var sel = window.getSelection().toString() || '\u6587\u672C';
+  var sel = window.getSelection().toString() || '文本';
   document.execCommand('insertHTML', false, '<div>' + prefix + sel + '</div>');
   doSave();
 }
 
 // ---- 工具函数 ----
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 // ---- 事件绑定 ----
 document.getElementById('editor').addEventListener('input', doSave);
@@ -134,7 +161,7 @@ document.getElementById('editor').addEventListener('keydown', function(e) {
   if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
 });
 
-// ---- 初始化：从URL路径打开笔记本 ----
+// ---- 初始化 ----
 openNote(getNoteName());
 </script>
 </body>
