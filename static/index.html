@@ -218,11 +218,11 @@ function renderInline(text) {
   // 删除线 ~~...~~
   text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
   // 加粗 **...** 或 __...__
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  // 斜体 *...* 或 _..._
-  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+  text = text.replace(/\*\*(\S.*?\S|\S)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__(\S.*?\S|\S)__/g, '<strong>$1</strong>');
+  // 斜体 *...* 或 _..._（要求 * 后面紧跟非空格字符）
+  text = text.replace(/\*(\S[^*]*?)\*/g, '<em>$1</em>');
+  text = text.replace(/_(\S[^_]*?)_/g, '<em>$1</em>');
   return text;
 }
 
@@ -357,15 +357,19 @@ document.getElementById('editor').addEventListener('keydown', function(e) {
 
 // 页面初始化
 var noteName = getNoteName();
+console.log('页面初始化，路径:', window.location.pathname, 'hash:', window.location.hash, 'noteName:', noteName);
 if (isImageMode()) {
   // 从 hash 中提取笔记本名
   var hashNoteName = window.location.hash.substring(2);
+  console.log('检测到图片模式，hash笔记本名:', hashNoteName);
   if (hashNoteName) {
     showImageMode(hashNoteName);
   } else {
+    console.log('hash笔记本名无效，回退到文本模式');
     openNote(noteName);
   }
 } else {
+  console.log('文本模式');
   openNote(noteName);
 }
 
