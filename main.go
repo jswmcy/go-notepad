@@ -16,7 +16,7 @@ import (
 const (
 	port    = ":3000"
 	dataDir = "./data"
-	version = "v1.2.0"
+	version = "v1.2.1"
 	buildDate = "2026-05-28"
 )
 
@@ -25,22 +25,19 @@ type Note struct {
 	Path string `json:"path"`
 }
 
-type ImageMetaEntry struct {
-	Image string `json:"image"`
-	Note  string `json:"note"`
-}
-
 func main() {
 	os.MkdirAll(dataDir, 0755)
-	http.HandleFunc("/", indexHandler)
+	
+	// 文本笔记 API
 	http.HandleFunc("/list", listHandler)
 	http.HandleFunc("/load", loadHandler)
 	http.HandleFunc("/save", saveHandler)
 	
-	// 图片笔记本相关 API
+	// 图片笔记相关 API
 	http.HandleFunc("/upload-image", uploadImageHandler)
 	http.HandleFunc("/list-images", listImagesHandler)
-	http.HandleFunc("/meta", metaHandler)
+	http.HandleFunc("/image-note", imageNoteHandler)
+	http.HandleFunc("/delete-image", deleteImageHandler)
 	
 	// 版本信息
 	http.HandleFunc("/version", versionHandler)
@@ -49,6 +46,10 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	// 数据文件服务：data/ 目录（用于图片访问）
 	http.Handle("/data/", http.StripPrefix("/data/", http.FileServer(http.Dir("data"))))
+	
+	// 最后注册通配符首页
+	http.HandleFunc("/", indexHandler)
+	
 	fmt.Printf("go-notepad running on http://localhost%s\n", port)
 	http.ListenAndServe(port, nil)
 }
@@ -103,11 +104,13 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
-	content := r.FormValue("content")
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
 	if name == "" {
 		name = "default"
 	}
+	body, _ := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	content := string(body)
 	path := filepath.Join(dataDir, name+".txt")
 	os.MkdirAll(filepath.Dir(path), 0755)
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -255,103 +258,135 @@ func listImagesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(imageFiles)
 }
 
-// GET /meta?name=笔记本名
-func getMetaHandler(w http.ResponseWriter, r *http.Request) {
+// 图片笔记块类型
+type ImageNoteBlock struct {
+	Type     string `json:"type"`     // "image" 或 "text"
+	Content  string `json:"content"`  // 图片文件名 或 文字内容
+	ID       string `json:"id"`       // 块唯一ID（时间戳+随机）
+	Created  string `json:"created"`  // 创建时间
+}
+
+// 图片笔记文档
+type ImageNoteDoc struct {
+	Name   string           `json:"name"`
+	Blocks []ImageNoteBlock `json:"blocks"`
+	Version int             `json:"version"`
+}
+
+// GET /image-note?name=笔记本名
+func getImageNoteHandler(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.URL.Query().Get("name"))
 	if name == "" {
 		http.Error(w, "Missing name parameter", 400)
 		return
 	}
 	
-	metaPath := filepath.Join(dataDir, name+"_images", "meta.json")
-	data, err := os.ReadFile(metaPath)
+	docPath := filepath.Join(dataDir, name+"_image_note.json")
+	data, err := os.ReadFile(docPath)
 	if err != nil {
-		// 文件不存在返回空对象
+		// 文件不存在返回空文档
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]ImageMetaEntry{})
+		json.NewEncoder(w).Encode(ImageNoteDoc{
+			Name:   name,
+			Blocks: []ImageNoteBlock{},
+			Version: 1,
+		})
 		return
 	}
 	
-	var meta map[string]ImageMetaEntry
-	err = json.Unmarshal(data, &meta)
+	var doc ImageNoteDoc
+	err = json.Unmarshal(data, &doc)
 	if err != nil {
-		http.Error(w, "Invalid meta.json format", 500)
+		http.Error(w, "Invalid image note format", 500)
 		return
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(meta)
+	json.NewEncoder(w).Encode(doc)
 }
 
-// POST /meta
-func postMetaHandler(w http.ResponseWriter, r *http.Request) {
+// POST /image-note
+func saveImageNoteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
 	
-	var req struct {
-		Name  string `json:"name"`
-		Image string `json:"image"`
-		Note  string `json:"note"`
-	}
-	
-	err := json.NewDecoder(r.Body).Decode(&req)
+	var doc ImageNoteDoc
+	err := json.NewDecoder(r.Body).Decode(&doc)
 	if err != nil {
 		http.Error(w, "Invalid JSON", 400)
 		return
 	}
 	
-	if req.Name == "" || req.Image == "" {
-		http.Error(w, "Missing required fields", 400)
+	if doc.Name == "" {
+		http.Error(w, "Missing name field", 400)
 		return
 	}
 	
-	metaPath := filepath.Join(dataDir, req.Name+"_images", "meta.json")
-	
-	// 读取现有meta
-	var meta map[string]ImageMetaEntry
-	data, err := os.ReadFile(metaPath)
-	if err == nil {
-		json.Unmarshal(data, &meta)
-	}
-	
-	if meta == nil {
-		meta = make(map[string]ImageMetaEntry)
-	}
-	
-	// 更新或添加条目
-	meta[req.Image] = ImageMetaEntry{
-		Image: req.Image,
-		Note:  req.Note,
-	}
-	
-	// 保存meta.json
-	newData, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		http.Error(w, "Failed to marshal meta", 500)
-		return
-	}
+	docPath := filepath.Join(dataDir, doc.Name+"_image_note.json")
 	
 	// 确保目录存在
-	os.MkdirAll(filepath.Dir(metaPath), 0755)
-	err = os.WriteFile(metaPath, newData, 0644)
+	os.MkdirAll(filepath.Dir(docPath), 0755)
+	
+	// 保存文档
+	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		http.Error(w, "Failed to save meta", 500)
+		http.Error(w, "Failed to marshal document", 500)
+		return
+	}
+	
+	err = os.WriteFile(docPath, data, 0644)
+	if err != nil {
+		http.Error(w, "Failed to save document", 500)
 		return
 	}
 	
 	w.Write([]byte("ok"))
 }
 
-// 统一meta处理器
-func metaHandler(w http.ResponseWriter, r *http.Request) {
+// 统一图片笔记处理器
+func imageNoteHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		getMetaHandler(w, r)
+		getImageNoteHandler(w, r)
 	case "POST":
-		postMetaHandler(w, r)
+		saveImageNoteHandler(w, r)
 	default:
 		http.Error(w, "Method not allowed", 405)
 	}
+}
+
+// DELETE /delete-image?name=笔记本名&filename=图片名
+func deleteImageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	filename := strings.TrimSpace(r.URL.Query().Get("filename"))
+	if name == "" || filename == "" {
+		http.Error(w, "Missing name or filename parameter", 400)
+		return
+	}
+
+	// 安全检查：确保文件名不包含路径穿越
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid filename", 400)
+		return
+	}
+
+	filePath := filepath.Join(dataDir, name+"_images", filename)
+	err := os.Remove(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			w.Write([]byte("deleted")) // 文件不存在也算成功
+			return
+		}
+		http.Error(w, "Failed to delete file: "+err.Error(), 500)
+		return
+	}
+
+	w.Write([]byte("deleted"))
 }

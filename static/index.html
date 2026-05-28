@@ -36,23 +36,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
 .editor em,.editor i{font-style:italic}
 .editor strong,.editor b{font-weight:bold}
 
-/* 图片笔记本样式 */
-#image-page{display:none;height:100vh;flex-direction:column}
-.image-grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
-.image-card{border:1px solid #eee;border-radius:6px;overflow:hidden;background:#fff;transition:box-shadow .2s}
-.image-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
-.image-preview{width:100%;height:180px;object-fit:cover;cursor:pointer;background:#fafafa}
-.image-note{width:100%;padding:8px;border:none;border-top:1px solid #eee;font-size:13px;outline:none;resize:none;min-height:60px;font-family:inherit}
-.image-note:focus{border-color:#ccc}
+/* 图片样式 */
+.editor .image-container{display:inline-block;position:relative;margin:8px 0;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.1);cursor:text;resize:both;overflow:hidden;min-width:100px;min-height:50px;max-width:100%;user-select:none}
+.editor .image-container:hover{box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.editor .image-container img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
+.editor .image-container .resize-handle{position:absolute;bottom:0;right:0;width:16px;height:16px;background:#2196f3;cursor:se-resize;border-radius:2px 0 4px 0;opacity:0.5}
+.editor .image-container:hover .resize-handle{opacity:1}
+.editor .image-container .action-buttons{position:absolute;top:4px;right:4px;display:none;flex-direction:row;gap:2px;z-index:10;background:rgba(255,255,255,.95);border-radius:3px;padding:2px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.editor .image-container:hover .action-buttons{display:flex}
+.editor .image-container .action-btn{width:24px;height:24px;background:transparent;color:#555;border:none;border-radius:2px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.editor .image-container .action-btn:hover{background:rgba(0,0,0,.1);color:#333}
+.editor .image-container .action-btn.delete:hover{background:rgba(244,67,54,.2);color:#f44336}
+.editor .image-container .action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.editor .image-container .double-click-hint{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.6);color:white;padding:2px 6px;border-radius:3px;font-size:11px;display:none}
+.editor .image-container:hover .double-click-hint{display:block}
+
+/* 任务列表样式 */
+.editor ul.task-list{list-style:none;padding-left:0}
+.editor ul.task-list li{list-style:none}
+.editor ul.task-list input[type="checkbox"]{cursor:pointer;vertical-align:middle}
+
+/* 图片灯箱 */
+.lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:2000;display:none;align-items:center;justify-content:center;cursor:pointer}
+.lightbox img{max-width:90%;max-height:90%;object-fit:contain;box-shadow:none}
+
+/* 提示 */
 .toast{position:fixed;top:20px;right:20px;background:#4caf50;color:white;padding:10px 16px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:fadeInOut 2.5s ease-in-out}
 @keyframes fadeInOut{0%,100%{opacity:0;transform:translateY(-10px)}20%,80%{opacity:1;transform:translateY(0)}}
-.lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:2000;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.lightbox img{max-width:90%;max-height:90%;object-fit:contain}
-.upload-area{border:2px dashed #ccc;border-radius:8px;padding:40px 20px;text-align:center;color:#666;margin-bottom:20px;cursor:pointer;transition:border-color .2s}
-.upload-area:hover{border-color:#999}
-.upload-area.dragover{border-color:#4caf50;background:#f8fff8}
-.mode-switch{margin-left:8px;padding:2px 8px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.mode-switch:hover{background:#f0f0f0}
 </style>
 </head>
 <body>
@@ -62,564 +75,80 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
     <a href="/">📝 列表</a>
     <span>/</span>
     <span id="note-title"></span>
-    <button id="mode-switch" class="mode-switch" onclick="toggleMode()" title="切换到图片笔记本">📷 图片</button>
   </div>
   <div class="toolbar">
     <button class="btn" onclick="doBold()" title="加粗"><b>B</b></button>
-    <button class="btn" onclick="doH1()" title="一级标题">H1</button>
-    <button class="btn" onclick="doH3()" title="三级标题">H3</button>
-    <button class="btn" onclick="doUl()" title="无序列表">—</button>
-    <button class="btn" onclick="doOl()" title="有序列表">1.</button>
-    <button class="btn" onclick="doQuote()" title="引用">></button>
-    <button class="btn" onclick="doCode()" title="代码块"><></button>
-    <button class="btn" onclick="doHr()" title="分割线">—</button>
+    <button class="btn" onclick="doH1()" title="一级标题">H¹</button>
+    <button class="btn" onclick="doH2()" title="二级标题">H²</button>
+    <button class="btn" onclick="doH3()" title="三级标题">H³</button>
+    <button class="btn" onclick="doParagraph()" title="段落">¶</button>
+    <button class="btn" onclick="doUl()" title="无序列表">•≡</button>
+    <button class="btn" onclick="doOl()" title="有序列表">1≡</button>
+    <button class="btn" onclick="doTaskList()" title="任务列表">☐</button>
+    <button class="btn" onclick="doQuote()" title="引用">❝</button>
+    <button class="btn" onclick="doCode()" title="代码块">{}</button>
+    <button class="btn" onclick="doLink()" title="链接">🔗</button>
+    <button class="btn" onclick="doHr()" title="分割线">─</button>
     <span id="status" class="status" style="opacity:0"></span>
   </div>
   <div class="editor-wrap"><div id="editor" class="editor" contenteditable="true"></div></div>
 </div>
 
-<!-- 图片笔记本页面 -->
-<div id="image-page">
-  <div class="note-name-bar">
-    <a href="/">📝 列表</a>
-    <span>/</span>
-    <span id="image-note-title"></span>
-    <button id="image-mode-switch" class="mode-switch" onclick="toggleMode()" title="切换到文本笔记本">📝 文本</button>
-  </div>
-  <div class="image-grid" id="image-grid">
-    <div class="upload-area" id="upload-area" onclick="document.getElementById('upload-input').click()">
-      <div>📷 点击上传或拖拽/粘贴图片到此处</div>
-      <div style="font-size:12px;margin-top:8px;color:#999">支持 PNG / JPEG / GIF / WebP，单张最大 10MB</div>
-    </div>
-  </div>
-  <input type="file" id="upload-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" onchange="handleFileSelect(event)">
+<!-- 图片灯箱 -->
+<div id="lightbox" class="lightbox" onclick="this.style.display='none'">
+  <img id="lightbox-img" src="" alt="">
 </div>
 
 <script>
-var currentNote = '';
+// ========== 全局变量 ==========
+var currentNoteName = '';
+var isSaving = false;
 var saveTimer = null;
-var statusTimer = null;
 
-function getNoteName() {
-  var path = window.location.pathname;
-  if (path === '/' || path === '') return 'default';
-  return decodeURIComponent(path.replace(/^\//, ''));
-}
-
-function showStatus(type, text) {
-  var el = document.getElementById('status');
-  el.className = 'status ' + type;
-  el.textContent = text;
-  el.style.opacity = '1';
-  if (statusTimer) clearTimeout(statusTimer);
-  if (type === 'ok') statusTimer = setTimeout(function() { el.style.opacity = '0'; }, 2000);
-}
-
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ========== MD 文本 → HTML 渲染 ==========
-// 支持语法：# ## ### 标题、**加粗__加粗、*斜体_斜体、~~删除线~~
-//          `行内代码`、```代码块```、> 引用、--- 分割线、- 无序列表、1. 有序列表
-
-function mdToHtml(text) {
-  var lines = text.split('\n');
-  var html = '';
-  var inCodeBlock = false;
-  var codeBuf = [];
-  var inList = false;
-  var listType = '';
-  var listBuf = [];
-
-  function flushList() {
-    if (inList && listBuf.length > 0) {
-      html += '<' + listType + '>' + listBuf.join('') + '</' + listType + '>';
-      listBuf = [];
-      inList = false;
-    }
-  }
-
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-
-    // 代码块
-    if (line.trim() === '```') {
-      flushList();
-      if (!inCodeBlock) {
-        inCodeBlock = true;
-        codeBuf = [];
-      } else {
-        inCodeBlock = false;
-        html += '<pre><code>' + escHtml(codeBuf.join('\n')) + '</code></pre>';
-      }
-      continue;
-    }
-    if (inCodeBlock) { codeBuf.push(line); continue; }
-
-    // 空行
-    if (line === '') {
-      flushList();
-      html += '<div><br></div>';
-      continue;
-    }
-
-    // 分割线
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
-      flushList();
-      html += '<hr>';
-      continue;
-    }
-
-    // 标题
-    var hMatch = line.match(/^(#{1,3})\s+(.+)/);
-    if (hMatch) {
-      flushList();
-      var tag = 'h' + hMatch[1].length;
-      html += '<' + tag + '>' + renderInline(hMatch[2]) + '</' + tag + '>';
-      continue;
-    }
-
-    // 引用
-    if (line.startsWith('>')) {
-      flushList();
-      html += '<blockquote>' + renderInline(line.replace(/^>\s*/, '')) + '</blockquote>';
-      continue;
-    }
-
-    // 无序列表
-    if (/^[\s]*[-*+]\s/.test(line)) {
-      if (!inList || listType !== 'ul') { flushList(); inList = true; listType = 'ul'; }
-      listBuf.push('<li>' + renderInline(line.replace(/^[\s]*[-*+]\s/, '')) + '</li>');
-      continue;
-    }
-
-    // 有序列表
-    if (/^[\s]*\d+\.\s/.test(line)) {
-      if (!inList || listType !== 'ol') { flushList(); inList = true; listType = 'ol'; }
-      listBuf.push('<li>' + renderInline(line.replace(/^[\s]*\d+\.\s/, '')) + '</li>');
-      continue;
-    }
-
-    // 普通段落
-    flushList();
-    html += '<div>' + renderInline(line) + '</div>';
-  }
-
-  flushList();
-  if (inCodeBlock && codeBuf.length > 0) {
-    html += '<pre><code>' + escHtml(codeBuf.join('\n')) + '</code></pre>';
-  }
-  return html;
-}
-
-// 行内渲染：加粗、斜体、删除线、行内代码
-function renderInline(text) {
-  // 行内代码 `...`
-  text = text.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  // 删除线 ~~...~~
-  text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  // 加粗 **...** 或 __...__
-  text = text.replace(/\*\*(\S.*?\S|\S)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/__(\S.*?\S|\S)__/g, '<strong>$1</strong>');
-  // 斜体 *...* 或 _..._（要求 * 后面紧跟非空格字符）
-  text = text.replace(/\*(\S[^*]*?)\*/g, '<em>$1</em>');
-  text = text.replace(/_(\S[^_]*?)_/g, '<em>$1</em>');
-  return text;
-}
-
-// ========== 加载笔记 ==========
-function openNote(name) {
-  currentNote = name;
-  document.getElementById('note-title').textContent = name;
-  var editor = document.getElementById('editor');
-  editor.innerHTML = '';
-  fetch('/load?name=' + encodeURIComponent(name))
-    .then(function(r) { return r.text(); })
-    .then(function(text) {
-      editor.innerHTML = text ? mdToHtml(text) : '<div><br></div>';
-    });
-}
-
-// ========== 保存 ==========
-function doSave() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(function() {
-    showStatus('saving', '保存中...');
-    var editor = document.getElementById('editor');
-    var nodes = editor.querySelectorAll('div,pre,h1,h2,h3,blockquote,hr,ul,ol');
-    var lines = [];
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      switch (n.tagName) {
-        case 'PRE':
-          lines.push('```');
-          var codeEl = n.querySelector('code');
-          lines.push(codeEl ? codeEl.textContent : n.textContent);
-          lines.push('```');
-          break;
-        case 'HR': break;
-        case 'H1': lines.push('# ' + n.textContent); break;
-        case 'H2': lines.push('## ' + n.textContent); break;
-        case 'H3': lines.push('### ' + n.textContent); break;
-        case 'BLOCKQUOTE': lines.push('> ' + n.textContent); break;
-        default:
-          lines.push(n.textContent);
-      }
-    }
-    fetch('/save', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: 'name=' + encodeURIComponent(currentNote) + '&content=' + encodeURIComponent(lines.join('\n'))
-    })
-    .then(function(r) {
-      if (r.ok) showStatus('ok', '✓ 保存成功');
-      else showStatus('err', '✗ 保存失败: ' + r.status);
-    })
-    .catch(function() { showStatus('err', '✗ 保存失败'); });
-  }, 500);
-}
-
-// ========== 格式化按钮 ==========
-function doBold() { document.execCommand('bold', false, null); doSave(); }
-
-function doCode() {
-  var sel = window.getSelection().toString();
-  if (sel && sel.indexOf('\n') !== -1)
-    document.execCommand('insertHTML', false, '<pre><code>' + escHtml(sel) + '</code></pre>');
-  else
-    document.execCommand('insertHTML', false, '<code>' + (sel || '代码') + '</code>');
-  doSave();
-}
-
-function doHr() { document.execCommand('insertHTML', false, '<hr>'); doSave(); }
-function doH1() { wrapSel('<h1>', '</h1>'); }
-function doH3() { wrapSel('<h3>', '</h3>'); }
-function doUl() { insertLine('• '); }
-function doOl() { insertLine('1. '); }
-function doQuote() { insertLine('> '); }
-
-function wrapSel(open, close) {
-  var sel = window.getSelection().toString() || '文本';
-  document.execCommand('insertHTML', false, open + sel + close);
-  doSave();
-}
-
-function insertLine(prefix) {
-  var sel = window.getSelection().toString() || '文本';
-  document.execCommand('insertHTML', false, '<div>' + prefix + sel + '</div>');
-  doSave();
-}
-
-// ========== 粘贴事件：纯文本粘贴（保留原格式） ==========
-document.getElementById('editor').addEventListener('paste', function(e) {
-  // 如果是图片模式，不拦截粘贴（让全局粘贴事件处理）
-  if (isImageMode()) return;
-  
-  e.preventDefault();
-  var text = e.clipboardData.getData('text/plain') || '';
-  if (!text) return;
-
-  // 判断是否为纯文本（不包含 Markdown 标记）
-  var isPlainText = !text.match(/(^|\s)(#{1,6}\s|[-*+]\s|>\s|\d+\.\s|```)/) && 
-                    (text.indexOf('**') === -1 && text.indexOf('__') === -1 && 
-                     text.indexOf('~~') === -1 && text.indexOf('`') === -1);
-  
-  var sel = window.getSelection();
-  if (sel.rangeCount > 0) {
-    var range = sel.getRangeAt(0);
-    range.deleteContents();
-    
-    if (isPlainText) {
-      // 纯文本：用 div 包裹插入（确保 doSave 能读取到）
-      var div = document.createElement('div');
-      div.textContent = text;
-      range.insertNode(div);
-    } else {
-      // 可能是 Markdown，尝试渲染
-      var div = document.createElement('div');
-      div.innerHTML = mdToHtml(text);
-      var frag = document.createDocumentFragment();
-      while (div.firstChild) frag.appendChild(div.firstChild);
-      range.insertNode(frag);
-    }
-    
-    // 光标移到末尾
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-  doSave();
-});
-
-document.getElementById('editor').addEventListener('input', doSave);
-document.getElementById('editor').addEventListener('keydown', function(e) {
-  if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
-});
-
-// 页面初始化
-var noteName = getNoteName();
-console.log('页面初始化，路径:', window.location.pathname, 'hash:', window.location.hash, 'noteName:', noteName);
-if (isImageMode()) {
-  // 从 hash 中提取笔记本名
-  var hashNoteName = window.location.hash.substring(2);
-  console.log('检测到图片模式，hash笔记本名:', hashNoteName);
-  if (hashNoteName) {
-    showImageMode(hashNoteName);
-  } else {
-    console.log('hash笔记本名无效，回退到文本模式');
-    openNote(noteName);
-  }
-} else {
-  console.log('文本模式');
-  openNote(noteName);
-}
-
-// ========== 图片笔记本功能 ==========
-
-var currentImageNoteName = '';
-var imageMeta = {};
-
-// 检查hash模式
-function checkHashMode() {
-  var hash = window.location.hash;
-  if (hash && hash.startsWith('#/')) {
-    var noteName = hash.substring(2);
-    if (noteName) {
-      showImageMode(noteName);
-    }
-  }
-}
-
-// 切换模式
-function toggleMode() {
-  var hash = window.location.hash;
-  
-  if (hash && hash.startsWith('#/')) {
-    // 当前是图片模式，切换到文本模式（从 hash 中取笔记本名）
-    var noteName = hash.substring(2);
-    window.location.href = '/' + noteName;
-  } else {
-    // 当前是文本模式，切换到图片模式
-    var noteName = getNoteName();
-    window.location.href = '/#/' + noteName;
-  }
-}
-
-// 判断当前是否是图片模式
-function isImageMode() {
-  var hash = window.location.hash;
-  return hash && hash.startsWith('#/');
-}
-
-// 显示图片模式
-function showImageMode(noteName) {
-  console.log('切换到图片模式，笔记本名:', noteName);
-  currentImageNoteName = noteName;
-  
-  // 隐藏文本编辑器，显示图片页面
-  document.getElementById('edit-page').style.display = 'none';
-  document.getElementById('image-page').style.display = 'flex';
-  document.getElementById('image-note-title').textContent = noteName;
-  
-  // 加载图片数据
-  loadImageData(noteName);
-  
-  // 设置拖拽上传事件
-  setupDragAndDrop();
-  
-  // 设置粘贴事件（只在图片模式下生效）
-  document.addEventListener('paste', function(e) {
-    if (isImageMode()) {
-      handlePaste(e);
-    }
-  });
-}
-
-// 加载图片数据
-function loadImageData(noteName) {
-  // 加载图片列表
-  fetch('/list-images?name=' + encodeURIComponent(noteName))
-    .then(function(r) { return r.json(); })
-    .then(function(images) {
-      // 加载meta数据
-      return fetch('/meta?name=' + encodeURIComponent(noteName))
-        .then(function(r) { return r.json(); })
-        .then(function(meta) {
-          imageMeta = meta;
-          renderImageGrid(images);
-        });
-    })
-    .catch(function(err) {
-      console.error('Failed to load image data:', err);
-      renderImageGrid([]);
-    });
-}
-
-// 渲染图片网格
-function renderImageGrid(images) {
-  var grid = document.getElementById('image-grid');
-  var uploadArea = document.getElementById('upload-area');
-  
-  // 清空现有图片卡片（保留上传区域）
-  grid.innerHTML = '';
-  grid.appendChild(uploadArea);
-  
-  // 按时间倒序排列（文件名包含时间戳）
-  images.sort().reverse();
-  
-  // 添加图片卡片
-  images.forEach(function(filename) {
-    var card = createImageCard(filename);
-    grid.appendChild(card);
-  });
-}
-
-// 创建图片卡片
-function createImageCard(filename) {
-  var card = document.createElement('div');
-  card.className = 'image-card';
-  
-  var img = document.createElement('img');
-  img.className = 'image-preview';
-  img.src = '/data/' + currentImageNoteName + '_images/' + filename;
-  img.alt = filename;
-  img.loading = 'lazy';
-  img.onclick = function() { showLightbox(img.src); };
-  
-  var textarea = document.createElement('textarea');
-  textarea.className = 'image-note';
-  textarea.placeholder = '添加备注...';
-  textarea.value = imageMeta[filename] ? imageMeta[filename].note : '';
-  textarea.onblur = function() {
-    saveImageNote(filename, textarea.value);
-  };
-  
-  card.appendChild(img);
-  card.appendChild(textarea);
-  return card;
-}
-
-// 显示灯箱
-function showLightbox(src) {
-  var lightbox = document.createElement('div');
-  lightbox.className = 'lightbox';
-  lightbox.onclick = function() { document.body.removeChild(lightbox); };
-  
-  var img = document.createElement('img');
-  img.src = src;
-  
-  lightbox.appendChild(img);
-  document.body.appendChild(lightbox);
-}
-
-// 保存图片备注
-function saveImageNote(filename, note) {
-  fetch('/meta', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      name: currentImageNoteName,
-      image: filename,
-      note: note
-    })
-  })
-  .then(function(r) {
-    if (r.ok) {
-      showToast('备注已保存');
-      // 更新本地meta
-      imageMeta[filename] = {image: filename, note: note};
-    }
-  })
-  .catch(function(err) {
-    console.error('Failed to save note:', err);
-    showToast('保存失败', 'error');
-  });
-}
-
-// 显示toast提示
-function showToast(message, type) {
+// ========== 工具函数 ==========
+function showToast(msg, type) {
   var toast = document.createElement('div');
   toast.className = 'toast';
-  toast.textContent = message;
+  toast.textContent = msg;
   if (type === 'error') {
     toast.style.background = '#f44336';
+  } else if (type === 'info') {
+    toast.style.background = '#2196f3';
   }
-  
   document.body.appendChild(toast);
   setTimeout(function() {
-    document.body.removeChild(toast);
+    toast.remove();
   }, 2500);
 }
 
-// 设置拖拽上传
-function setupDragAndDrop() {
-  var uploadArea = document.getElementById('upload-area');
-  
-  uploadArea.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    uploadArea.classList.add('dragover');
-  });
-  
-  uploadArea.addEventListener('dragleave', function(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('dragover');
-  });
-  
-  uploadArea.addEventListener('drop', function(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('dragover');
-    
-    var files = e.dataTransfer.files;
-    handleFiles(files);
-  });
-}
-
-// 处理粘贴
+// ========== 图片处理 ==========
 function handlePaste(e) {
   var items = e.clipboardData.items;
-  var imageFiles = [];
-  
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
     if (item.type.indexOf('image') !== -1) {
+      e.preventDefault();
       var file = item.getAsFile();
-      if (file) imageFiles.push(file);
+      if (file) {
+        uploadAndInsertImage(file);
+      }
+      break;
     }
   }
-  
-  if (imageFiles.length > 0) {
-    e.preventDefault();
-    handleFiles(imageFiles);
-  }
 }
 
-// 处理文件选择
-function handleFileSelect(e) {
-  var files = e.target.files;
-  handleFiles(files);
-  // 清空input以便下次选择相同文件
-  e.target.value = '';
-}
-
-// 处理文件上传
-function handleFiles(files) {
-  for (var i = 0; i < files.length; i++) {
-    uploadImage(files[i]);
-  }
-}
-
-// 上传单张图片
-function uploadImage(file) {
-  if (!currentImageNoteName) {
-    showToast('错误: 笔记本名称为空，请刷新页面后重试', 'error');
+function uploadAndInsertImage(file) {
+  if (!currentNoteName) {
+    showToast('请先保存笔记', 'error');
     return;
   }
+  
+  showToast('上传图片中...', 'info');
   
   var formData = new FormData();
   formData.append('image', file);
   
-  showToast('上传中...', 'info');
-  
-  fetch('/upload-image?name=' + encodeURIComponent(currentImageNoteName), {
+  fetch('/upload-image?name=' + encodeURIComponent(currentNoteName), {
     method: 'POST',
     body: formData
   })
@@ -632,29 +161,491 @@ function uploadImage(file) {
     return r.json();
   })
   .then(function(result) {
-    showToast('上传成功');
-    loadImageData(currentImageNoteName);
+    // 创建图片容器
+    var container = document.createElement('div');
+    container.className = 'image-container';
+    
+    var img = document.createElement('img');
+    img.src = result.path;
+    img.alt = '图片';
+    
+    var handle = document.createElement('div');
+    handle.className = 'resize-handle';
+    
+    // 操作按钮
+    var actionButtons = document.createElement('div');
+    actionButtons.className = 'action-buttons';
+    
+    var zoomBtn = document.createElement('button');
+    zoomBtn.className = 'action-btn';
+    zoomBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+    zoomBtn.title = '放大';
+    zoomBtn.onclick = function(e) {
+      e.stopPropagation();
+      openLightbox(img.src);
+    };
+    
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'action-btn delete';
+    deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+    deleteBtn.title = '删除';
+    deleteBtn.onclick = function(e) {
+      e.stopPropagation();
+      // 从 img src 提取文件名，通知后端删除文件
+      var imgSrc = img.getAttribute('src');
+      var parts = imgSrc.split('/');
+      var filename = parts[parts.length - 1];
+      fetch('/delete-image?name=' + currentNoteName + '&filename=' + encodeURIComponent(filename), { method: 'POST' });
+      container.remove();
+      doSave();
+      showToast('图片已删除');
+    };
+    
+    actionButtons.appendChild(zoomBtn);
+    actionButtons.appendChild(deleteBtn);
+    
+    // 双击提示
+    var hint = document.createElement('div');
+    hint.className = 'double-click-hint';
+    hint.textContent = '双击放大';
+    
+    container.appendChild(img);
+    container.appendChild(handle);
+    container.appendChild(actionButtons);
+    container.appendChild(hint);
+    
+    // 双击放大
+    var clickTimer = null;
+    container.addEventListener('click', function(e) {
+      if (e.target === container || e.target === img) {
+        if (clickTimer === null) {
+          clickTimer = setTimeout(function() {
+            clickTimer = null;
+            // 单次点击：选中图片（光标定位）
+            var range = document.createRange();
+            range.selectNode(container);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }, 300);
+        }
+      }
+    });
+    
+    container.addEventListener('dblclick', function(e) {
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
+      if (e.target === container || e.target === img) {
+        openLightbox(img.src);
+      }
+    });
+    
+    // 在光标位置插入
+    var selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      var range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(container);
+      // 插入换行
+      var br = document.createElement('br');
+      range.collapse(false);
+      range.insertNode(br);
+      // 移动光标到换行后
+      range.setStartAfter(br);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      // 没有选中位置，添加到末尾
+      document.getElementById('editor').appendChild(container);
+      document.getElementById('editor').appendChild(document.createElement('br'));
+    }
+    
+    showToast('图片已插入');
+    doSave(); // 触发保存
   })
   .catch(function(err) {
-    console.error('Upload failed:', err);
-    showToast('上传失败: ' + err.message, 'error');
+    console.error('图片上传失败:', err);
+    showToast('图片上传失败: ' + err.message, 'error');
   });
 }
-// 页面加载时检查版本信息并在页脚显示
-fetch('/version')
-  .then(res => res.json())
-  .then(data => {
-    console.log('go-notepad version:', data.version, 'built on', data.buildDate);
-    var versionEl = document.createElement('div');
-    versionEl.style.cssText = 'position:fixed;bottom:5px;right:5px;font-size:11px;color:#999;opacity:0.7;z-index:9999;cursor:pointer;';
-    versionEl.title = '点击查看版本详情';
-    versionEl.innerHTML = 'v' + data.version;
-    versionEl.onclick = function() {
-      alert('go-notepad v' + data.version + '\n构建日期: ' + data.buildDate + '\n访问 /version 获取完整信息');
-    };
-    document.body.appendChild(versionEl);
+
+// 图片点击放大
+function openLightbox(imgSrc) {
+  var lightbox = document.getElementById('lightbox');
+  var lightboxImg = document.getElementById('lightbox-img');
+  lightboxImg.src = imgSrc;
+  lightbox.style.display = 'flex';
+}
+
+function setupImageLightbox() {
+  // 保留原有的点击事件处理，但只处理非容器内的图片
+  // 容器内的图片现在通过双击或悬停按钮打开
+  document.getElementById('editor').addEventListener('click', function(e) {
+    var target = e.target;
+    // 点击图片（非容器内的图片）
+    if (target.tagName === 'IMG' && !target.parentElement.classList.contains('image-container')) {
+      openLightbox(target.src);
+    }
+  });
+}
+
+// ========== 编辑器功能 ==========
+function doBold() { document.execCommand('bold'); }
+function doH1() { document.execCommand('formatBlock', false, '<h1>'); }
+function doH2() { document.execCommand('formatBlock', false, '<h2>'); }
+function doH3() { document.execCommand('formatBlock', false, '<h3>'); }
+function doParagraph() { document.execCommand('formatBlock', false, '<p>'); }
+function doUl() { document.execCommand('insertUnorderedList'); }
+function doOl() { document.execCommand('insertOrderedList'); }
+function doTaskList() {
+  var li = document.createElement('li');
+  var checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.style.marginRight = '8px';
+  checkbox.onclick = function(e) {
+    e.stopPropagation(); // 防止事件冒泡
+  };
+  li.appendChild(checkbox);
+  li.appendChild(document.createTextNode(' '));
+  
+  // 检查是否在列表中
+  var sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    var range = sel.getRangeAt(0);
+    var parent = range.commonAncestorContainer;
+    while (parent && parent.nodeType !== 1) {
+      parent = parent.parentNode;
+    }
+    if (parent && (parent.tagName === 'UL' || parent.tagName === 'OL')) {
+      // 在列表中：插入 li
+      parent.appendChild(li);
+    } else {
+      // 不在列表中：创建 ul
+      var ul = document.createElement('ul');
+      ul.className = 'task-list';
+      ul.appendChild(li);
+      insertAtCursor(ul);
+    }
+  }
+}
+function doQuote() { document.execCommand('formatBlock', false, '<blockquote>'); }
+function doLink() {
+  var url = prompt('输入链接 URL:');
+  if (url) {
+    var text = prompt('输入链接文本:', url);
+    var sel = window.getSelection();
+    var range = sel.getRangeAt(0);
+    var link = document.createElement('a');
+    link.href = url;
+    link.textContent = text || url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    if (!range.collapsed) {
+      range.extractContents();
+    }
+    range.insertNode(link);
+  }
+}
+function doCode() {
+  var pre = document.createElement('pre');
+  var code = document.createElement('code');
+  code.textContent = '// 输入代码';
+  pre.appendChild(code);
+  insertAtCursor(pre);
+}
+function doHr() { document.execCommand('insertHorizontalRule'); }
+
+function insertAtCursor(node) {
+  var selection = window.getSelection();
+  if (selection.rangeCount > 0) {
+    var range = selection.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+// ========== 保存/加载 ==========
+function doSave() {
+  if (isSaving || !currentNoteName) return;
+  isSaving = true;
+  
+  // 同步任务列表复选框状态到 HTML
+  var checkboxes = document.getElementById('editor').querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(function(cb) {
+    if (cb.checked) {
+      cb.setAttribute('checked', 'checked');
+    } else {
+      cb.removeAttribute('checked');
+    }
+  });
+  
+  var editor = document.getElementById('editor');
+  var content = editor.innerHTML;
+  
+  var status = document.getElementById('status');
+  status.textContent = '保存中...';
+  status.className = 'status saving';
+  status.style.opacity = 1;
+  
+  fetch('/save?name=' + encodeURIComponent(currentNoteName), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: content
   })
-  .catch(err => console.log('Version check failed:', err));
+  .then(function(r) {
+    if (!r.ok) throw new Error('保存失败: ' + r.status);
+    status.textContent = '已保存';
+    status.className = 'status ok';
+    setTimeout(function() { status.style.opacity = 0; }, 2000);
+  })
+  .catch(function(err) {
+    console.error('Save error:', err);
+    status.textContent = '保存失败';
+    status.className = 'status err';
+    setTimeout(function() { status.style.opacity = 0; }, 3000);
+  })
+  .finally(function() {
+    isSaving = false;
+  });
+}
+
+function openNote(name) {
+  currentNoteName = name;
+  document.getElementById('note-title').textContent = name;
+  
+  fetch('/load?name=' + encodeURIComponent(name))
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      var editor = document.getElementById('editor');
+      editor.innerHTML = text || '<p><br></p>';
+      // 将已有的图片包裹成容器
+      wrapExistingImages();
+      editor.focus();
+    })
+    .catch(function(err) {
+      console.error('Load error:', err);
+      document.getElementById('editor').innerHTML = '<p><br></p>';
+    });
+}
+
+// 将已有的图片包裹成可拖拽大小的容器
+function wrapExistingImages() {
+  var editor = document.getElementById('editor');
+  var images = editor.querySelectorAll('img:not(.image-container img)');
+  
+  images.forEach(function(img) {
+    // 如果图片已经在容器里，跳过
+    if (img.parentElement && img.parentElement.classList.contains('image-container')) {
+      return;
+    }
+    
+    var container = document.createElement('div');
+    container.className = 'image-container';
+    
+    var handle = document.createElement('div');
+    handle.className = 'resize-handle';
+    
+    // 操作按钮
+    var actionButtons = document.createElement('div');
+    actionButtons.className = 'action-buttons';
+    
+    var zoomBtn = document.createElement('button');
+    zoomBtn.className = 'action-btn';
+    zoomBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+    zoomBtn.title = '放大';
+    zoomBtn.onclick = function(e) {
+      e.stopPropagation();
+      openLightbox(img.src);
+    };
+    
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'action-btn delete';
+    deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+    deleteBtn.title = '删除';
+    deleteBtn.onclick = function(e) {
+      e.stopPropagation();
+      // 从 img src 提取文件名，通知后端删除文件
+      var imgSrc = img.getAttribute('src');
+      var parts = imgSrc.split('/');
+      var filename = parts[parts.length - 1];
+      fetch('/delete-image?name=' + currentNoteName + '&filename=' + encodeURIComponent(filename), { method: 'POST' });
+      container.remove();
+      doSave();
+      showToast('图片已删除');
+    };
+    
+    actionButtons.appendChild(zoomBtn);
+    actionButtons.appendChild(deleteBtn);
+    
+    // 双击提示
+    var hint = document.createElement('div');
+    hint.className = 'double-click-hint';
+    hint.textContent = '双击放大';
+    
+    // 替换图片
+    img.parentNode.insertBefore(container, img);
+    container.appendChild(img);
+    container.appendChild(handle);
+    container.appendChild(actionButtons);
+    container.appendChild(hint);
+    
+    // 双击放大
+    var clickTimer = null;
+    container.addEventListener('click', function(e) {
+      if (e.target === container || e.target === img) {
+        if (clickTimer === null) {
+          clickTimer = setTimeout(function() {
+            clickTimer = null;
+            var range = document.createRange();
+            range.selectNode(container);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }, 300);
+        }
+      }
+    });
+    
+    container.addEventListener('dblclick', function(e) {
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
+      if (e.target === container || e.target === img) {
+        openLightbox(img.src);
+      }
+    });
+  });
+}
+
+// ========== 页面初始化 ==========
+function getNoteName() {
+  var path = window.location.pathname;
+  if (path === '/' || path === '') return 'default';
+  return path.substring(1);
+}
+
+function init() {
+  var noteName = getNoteName();
+  console.log('打开笔记本:', noteName);
+  
+  // 设置粘贴事件
+  document.getElementById('editor').addEventListener('paste', handlePaste);
+  
+  // 设置图片灯箱
+  setupImageLightbox();
+  
+  // 自动保存
+  document.getElementById('editor').addEventListener('input', function() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 1000);
+  });
+  
+  // 防止 Tab 键切换焦点
+  document.getElementById('editor').addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
+  });
+  
+  // 键盘删除图片：用 TreeWalker 从光标位置向前查找
+  document.addEventListener('keydown', function(e) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.altKey) {
+      var selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        var range = selection.getRangeAt(0);
+        var container = null;
+        
+        // 方法1：选区是否在图片容器内
+        var node = range.startContainer;
+        while (node) {
+          if (node.nodeType === 1 && node.classList && node.classList.contains('image-container')) {
+            container = node;
+            break;
+          }
+          node = node.parentElement || node.parentNode;
+        }
+        
+        // 方法2：Backspace 光标折叠，向前查找图片容器
+        if (!container && e.key === 'Backspace' && range.collapsed) {
+          // 光标在文本中间则不触发
+          if (!(range.startContainer.nodeType === 3 && range.startOffset > 0)) {
+            var editor = document.getElementById('editor');
+            var walker = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null, false);
+            walker.currentNode = range.startContainer;
+            
+            // 收集要删除的中间节点（<br>、空文本）
+            var toRemove = [];
+            var foundImage = null;
+            var prev = walker.previousNode();
+            while (prev) {
+              if (prev.nodeType === 1 && prev.classList && prev.classList.contains('image-container')) {
+                foundImage = prev;
+                break;
+              }
+              if ((prev.nodeType === 3 && prev.textContent.trim() === '') || (prev.nodeType === 1 && prev.nodeName === 'BR')) {
+                toRemove.push(prev);
+                prev = walker.previousNode();
+                continue;
+              }
+              break; // 遇到其他内容，停止
+            }
+            
+            if (foundImage) {
+              e.preventDefault();
+              // 先清理中间 <br> 和空文本
+              for (var k = 0; k < toRemove.length; k++) {
+                if (toRemove[k].parentNode) toRemove[k].parentNode.removeChild(toRemove[k]);
+              }
+              container = foundImage;
+            }
+          }
+        }
+        
+        if (container && container.classList && container.classList.contains('image-container')) {
+          e.preventDefault();
+          var imgEl = container.querySelector('img');
+          if (imgEl) {
+            var imgSrc2 = imgEl.getAttribute('src');
+            var parts2 = imgSrc2.split('/');
+            var filename2 = parts2[parts2.length - 1];
+            fetch('/delete-image?name=' + currentNoteName + '&filename=' + encodeURIComponent(filename2), { method: 'POST' });
+          }
+          container.remove();
+          doSave();
+          showToast('图片已删除');
+        }
+      }
+    }
+  });
+  
+  // 打开笔记
+  openNote(noteName);
+  
+  // 版本信息
+  fetch('/version')
+    .then(res => res.json())
+    .then(data => {
+      console.log('go-notepad version:', data.version, 'built on', data.buildDate);
+      var versionEl = document.createElement('div');
+      versionEl.style.cssText = 'position:fixed;bottom:5px;right:5px;font-size:11px;color:#999;opacity:0.7;z-index:9999;cursor:pointer;';
+      versionEl.textContent = data.version;
+      versionEl.title = '构建于 ' + data.buildDate;
+      versionEl.onclick = function() {
+        window.open('/version', '_blank');
+      };
+      document.body.appendChild(versionEl);
+    })
+    .catch(err => console.error('Failed to fetch version:', err));
+}
+
+// 页面加载完成
+window.onload = init;
 </script>
 </body>
 </html>
