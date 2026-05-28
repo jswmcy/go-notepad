@@ -16,6 +16,8 @@ import (
 const (
 	port    = ":3000"
 	dataDir = "./data"
+	version = "v1.2.0"
+	buildDate = "2026-05-28"
 )
 
 type Note struct {
@@ -40,6 +42,9 @@ func main() {
 	http.HandleFunc("/list-images", listImagesHandler)
 	http.HandleFunc("/meta", metaHandler)
 	
+	// 版本信息
+	http.HandleFunc("/version", versionHandler)
+	
 	// 静态文件服务：static/ 目录
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	// 数据文件服务：data/ 目录（用于图片访问）
@@ -48,8 +53,24 @@ func main() {
 	http.ListenAndServe(port, nil)
 }
 
+// 版本信息处理器
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(map[string]string{
+		"version":   version,
+		"buildDate": buildDate,
+		"app":       "go-notepad",
+		"status":    "running",
+	})
+}
+
 // 所有路径都返回首页，由前端根据路径判断打开哪个笔记本
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	// /version 页面返回版本信息
+	if r.URL.Path == "/version" {
+		versionHandler(w, r)
+		return
+	}
 	http.ServeFile(w, r, "static/index.html")
 }
 

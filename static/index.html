@@ -639,6 +639,13 @@ function uploadImage(file) {
     console.error('Upload failed:', err);
     showToast('上传失败: ' + err.message, 'error');
   });
+  // 检查版本信息
+  fetch('/version')
+    .then(res => res.json())
+    .then(data => {
+      console.log('go-notepad version:', data.version, 'built on', data.buildDate);
+    })
+    .catch(err => console.log('Version check failed:', err));
 }
 </script>
 </body>
