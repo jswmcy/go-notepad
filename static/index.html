@@ -344,8 +344,19 @@ document.getElementById('editor').addEventListener('keydown', function(e) {
   if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;'); }
 });
 
-openNote(getNoteName());
-checkHashMode();
+// 页面初始化
+var noteName = getNoteName();
+if (isImageMode()) {
+  // 从 hash 中提取笔记本名
+  var hashNoteName = window.location.hash.substring(2);
+  if (hashNoteName) {
+    showImageMode(hashNoteName);
+  } else {
+    openNote(noteName);
+  }
+} else {
+  openNote(noteName);
+}
 
 // ========== 图片笔记本功能 ==========
 
@@ -591,15 +602,21 @@ function uploadImage(file) {
     method: 'POST',
     body: formData
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r.ok) {
+      return r.text().then(function(txt) {
+        throw new Error(r.status + ': ' + txt);
+      });
+    }
+    return r.json();
+  })
   .then(function(result) {
     showToast('上传成功');
-    // 重新加载图片数据
     loadImageData(currentImageNoteName);
   })
   .catch(function(err) {
     console.error('Upload failed:', err);
-    showToast('上传失败', 'error');
+    showToast('上传失败: ' + err.message, 'error');
   });
 }
 </script>

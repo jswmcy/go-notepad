@@ -135,37 +135,38 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		http.Error(w, "No image file provided", 400)
+		http.Error(w, "No image file provided: " + err.Error(), 400)
 		return
 	}
 	defer file.Close()
 	
-	// 检查文件类型
-	mimeType := header.Header.Get("Content-Type")
-	allowedMimeTypes := map[string]bool{
-		"image/png":  true,
-		"image/jpeg": true,
-		"image/gif":  true,
-		"image/webp": true,
+	// 检查文件类型（从文件名判断扩展名，MIME 头不可靠）
+	filename := header.Filename
+	ext := strings.ToLower(filepath.Ext(filename))
+	allowedExts := map[string]string{
+		".png":  "png",
+		".jpg":  "jpg",
+		".jpeg": "jpg",
+		".gif":  "gif",
+		".webp": "webp",
 	}
-	if !allowedMimeTypes[mimeType] {
-		http.Error(w, "Unsupported image type. Allowed: PNG, JPEG, GIF, WebP", 400)
-		return
-	}
-	
-	// 获取文件扩展名
-	ext := ""
-	switch mimeType {
-	case "image/png":
-		ext = "png"
-	case "image/jpeg":
-		ext = "jpg"
-	case "image/gif":
-		ext = "gif"
-	case "image/webp":
-		ext = "webp"
-	default:
-		ext = "bin"
+	outExt, ok := allowedExts[ext]
+	if !ok {
+		// 兜底：从 MIME 类型推断
+		mimeType := header.Header.Get("Content-Type")
+		switch mimeType {
+		case "image/png":
+			outExt = "png"
+		case "image/jpeg":
+			outExt = "jpg"
+		case "image/gif":
+			outExt = "gif"
+		case "image/webp":
+			outExt = "webp"
+		default:
+			http.Error(w, "Unsupported image type. Allowed: PNG, JPEG, GIF, WebP", 400)
+			return
+		}
 	}
 	
 	// 创建图片目录
@@ -177,20 +178,20 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// 生成文件名
-	filename := generateRandomFilename(ext)
+	filename := generateRandomFilename(outExt)
 	filePath := filepath.Join(imageDir, filename)
 	
 	// 保存文件
 	dst, err := os.Create(filePath)
 	if err != nil {
-		http.Error(w, "Failed to save file", 500)
+		http.Error(w, "Failed to save file: " + err.Error(), 500)
 		return
 	}
 	defer dst.Close()
 	
 	_, err = io.Copy(dst, file)
 	if err != nil {
-		http.Error(w, "Failed to save file", 500)
+		http.Error(w, "Failed to save file: " + err.Error(), 500)
 		return
 	}
 	
