@@ -639,14 +639,22 @@ function uploadImage(file) {
     console.error('Upload failed:', err);
     showToast('上传失败: ' + err.message, 'error');
   });
-  // 检查版本信息
-  fetch('/version')
-    .then(res => res.json())
-    .then(data => {
-      console.log('go-notepad version:', data.version, 'built on', data.buildDate);
-    })
-    .catch(err => console.log('Version check failed:', err));
 }
+// 页面加载时检查版本信息并在页脚显示
+fetch('/version')
+  .then(res => res.json())
+  .then(data => {
+    console.log('go-notepad version:', data.version, 'built on', data.buildDate);
+    var versionEl = document.createElement('div');
+    versionEl.style.cssText = 'position:fixed;bottom:5px;right:5px;font-size:11px;color:#999;opacity:0.7;z-index:9999;cursor:pointer;';
+    versionEl.title = '点击查看版本详情';
+    versionEl.innerHTML = 'v' + data.version;
+    versionEl.onclick = function() {
+      alert('go-notepad v' + data.version + '\n构建日期: ' + data.buildDate + '\n访问 /version 获取完整信息');
+    };
+    document.body.appendChild(versionEl);
+  })
+  .catch(err => console.log('Version check failed:', err));
 </script>
 </body>
 </html>
