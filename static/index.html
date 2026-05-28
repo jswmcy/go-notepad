@@ -329,9 +329,10 @@ document.getElementById('editor').addEventListener('paste', function(e) {
     range.deleteContents();
     
     if (isPlainText) {
-      // 纯文本直接插入
-      var textNode = document.createTextNode(text);
-      range.insertNode(textNode);
+      // 纯文本：用 div 包裹插入（确保 doSave 能读取到）
+      var div = document.createElement('div');
+      div.textContent = text;
+      range.insertNode(div);
     } else {
       // 可能是 Markdown，尝试渲染
       var div = document.createElement('div');
@@ -407,6 +408,7 @@ function isImageMode() {
 
 // 显示图片模式
 function showImageMode(noteName) {
+  console.log('切换到图片模式，笔记本名:', noteName);
   currentImageNoteName = noteName;
   
   // 隐藏文本编辑器，显示图片页面
@@ -603,6 +605,11 @@ function handleFiles(files) {
 
 // 上传单张图片
 function uploadImage(file) {
+  if (!currentImageNoteName) {
+    showToast('错误: 笔记本名称为空，请刷新页面后重试', 'error');
+    return;
+  }
+  
   var formData = new FormData();
   formData.append('image', file);
   
