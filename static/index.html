@@ -35,6 +35,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
 .editor li{margin:3px 0}
 .editor em,.editor i{font-style:italic}
 .editor strong,.editor b{font-weight:bold}
+
+/* 图片笔记本样式 */
+#image-page{display:none;height:100vh;flex-direction:column}
+.image-grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.image-card{border:1px solid #eee;border-radius:6px;overflow:hidden;background:#fff;transition:box-shadow .2s}
+.image-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.image-preview{width:100%;height:180px;object-fit:cover;cursor:pointer;background:#fafafa}
+.image-note{width:100%;padding:8px;border:none;border-top:1px solid #eee;font-size:13px;outline:none;resize:none;min-height:60px;font-family:inherit}
+.image-note:focus{border-color:#ccc}
+.toast{position:fixed;top:20px;right:20px;background:#4caf50;color:white;padding:10px 16px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:fadeInOut 2.5s ease-in-out}
+@keyframes fadeInOut{0%,100%{opacity:0;transform:translateY(-10px)}20%,80%{opacity:1;transform:translateY(0)}}
+.lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:2000;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.lightbox img{max-width:90%;max-height:90%;object-fit:contain}
+.upload-area{border:2px dashed #ccc;border-radius:8px;padding:40px 20px;text-align:center;color:#666;margin-bottom:20px;cursor:pointer;transition:border-color .2s}
+.upload-area:hover{border-color:#999}
+.upload-area.dragover{border-color:#4caf50;background:#f8fff8}
+.mode-switch{margin-left:8px;padding:2px 8px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.mode-switch:hover{background:#f0f0f0}
 </style>
 </head>
 <body>
@@ -44,6 +62,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
     <a href="/">📝 列表</a>
     <span>/</span>
     <span id="note-title"></span>
+    <button id="mode-switch" class="mode-switch" onclick="toggleMode()" title="切换到图片笔记本">📷 图片</button>
   </div>
   <div class="toolbar">
     <button class="btn" onclick="doBold()" title="加粗"><b>B</b></button>
@@ -57,6 +76,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;col
     <span id="status" class="status" style="opacity:0"></span>
   </div>
   <div class="editor-wrap"><div id="editor" class="editor" contenteditable="true"></div></div>
+</div>
+
+<!-- 图片笔记本页面 -->
+<div id="image-page">
+  <div class="note-name-bar">
+    <a href="/">📝 列表</a>
+    <span>/</span>
+    <span id="image-note-title"></span>
+    <button id="image-mode-switch" class="mode-switch" onclick="toggleMode()" title="切换到文本笔记本">📝 文本</button>
+  </div>
+  <div class="image-grid" id="image-grid">
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('upload-input').click()">
+      <div>📷 点击上传或拖拽/粘贴图片到此处</div>
+      <div style="font-size:12px;margin-top:8px;color:#999">支持 PNG / JPEG / GIF / WebP，单张最大 10MB</div>
+    </div>
+  </div>
+  <input type="file" id="upload-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" onchange="handleFileSelect(event)">
 </div>
 
 <script>
@@ -306,6 +342,252 @@ document.getElementById('editor').addEventListener('keydown', function(e) {
 });
 
 openNote(getNoteName());
+checkHashMode();
+
+// ========== 图片笔记本功能 ==========
+
+var currentImageNoteName = '';
+var imageMeta = {};
+
+// 检查hash模式
+function checkHashMode() {
+  var hash = window.location.hash;
+  if (hash && hash.startsWith('#/')) {
+    var noteName = hash.substring(2);
+    if (noteName) {
+      showImageMode(noteName);
+    }
+  }
+}
+
+// 切换模式
+function toggleMode() {
+  var hash = window.location.hash;
+  var noteName = getNoteName();
+  
+  if (hash && hash.startsWith('#/')) {
+    // 当前是图片模式，切换到文本模式
+    window.location.href = '/' + noteName;
+  } else {
+    // 当前是文本模式，切换到图片模式
+    window.location.href = '/#' + noteName;
+  }
+}
+
+// 显示图片模式
+function showImageMode(noteName) {
+  currentImageNoteName = noteName;
+  
+  // 隐藏文本编辑器，显示图片页面
+  document.getElementById('edit-page').style.display = 'none';
+  document.getElementById('image-page').style.display = 'flex';
+  document.getElementById('image-note-title').textContent = noteName;
+  
+  // 加载图片数据
+  loadImageData(noteName);
+  
+  // 设置拖拽上传事件
+  setupDragAndDrop();
+  
+  // 设置粘贴事件
+  document.addEventListener('paste', handlePaste);
+}
+
+// 加载图片数据
+function loadImageData(noteName) {
+  // 加载图片列表
+  fetch('/list-images?name=' + encodeURIComponent(noteName))
+    .then(function(r) { return r.json(); })
+    .then(function(images) {
+      // 加载meta数据
+      return fetch('/meta?name=' + encodeURIComponent(noteName))
+        .then(function(r) { return r.json(); })
+        .then(function(meta) {
+          imageMeta = meta;
+          renderImageGrid(images);
+        });
+    })
+    .catch(function(err) {
+      console.error('Failed to load image data:', err);
+      renderImageGrid([]);
+    });
+}
+
+// 渲染图片网格
+function renderImageGrid(images) {
+  var grid = document.getElementById('image-grid');
+  var uploadArea = document.getElementById('upload-area');
+  
+  // 清空现有图片卡片（保留上传区域）
+  grid.innerHTML = '';
+  grid.appendChild(uploadArea);
+  
+  // 按时间倒序排列（文件名包含时间戳）
+  images.sort().reverse();
+  
+  // 添加图片卡片
+  images.forEach(function(filename) {
+    var card = createImageCard(filename);
+    grid.appendChild(card);
+  });
+}
+
+// 创建图片卡片
+function createImageCard(filename) {
+  var card = document.createElement('div');
+  card.className = 'image-card';
+  
+  var img = document.createElement('img');
+  img.className = 'image-preview';
+  img.src = '/static/' + currentImageNoteName + '_images/' + filename;
+  img.alt = filename;
+  img.loading = 'lazy';
+  img.onclick = function() { showLightbox(img.src); };
+  
+  var textarea = document.createElement('textarea');
+  textarea.className = 'image-note';
+  textarea.placeholder = '添加备注...';
+  textarea.value = imageMeta[filename] ? imageMeta[filename].note : '';
+  textarea.onblur = function() {
+    saveImageNote(filename, textarea.value);
+  };
+  
+  card.appendChild(img);
+  card.appendChild(textarea);
+  return card;
+}
+
+// 显示灯箱
+function showLightbox(src) {
+  var lightbox = document.createElement('div');
+  lightbox.className = 'lightbox';
+  lightbox.onclick = function() { document.body.removeChild(lightbox); };
+  
+  var img = document.createElement('img');
+  img.src = src;
+  
+  lightbox.appendChild(img);
+  document.body.appendChild(lightbox);
+}
+
+// 保存图片备注
+function saveImageNote(filename, note) {
+  fetch('/meta', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: currentImageNoteName,
+      image: filename,
+      note: note
+    })
+  })
+  .then(function(r) {
+    if (r.ok) {
+      showToast('备注已保存');
+      // 更新本地meta
+      imageMeta[filename] = {image: filename, note: note};
+    }
+  })
+  .catch(function(err) {
+    console.error('Failed to save note:', err);
+    showToast('保存失败', 'error');
+  });
+}
+
+// 显示toast提示
+function showToast(message, type) {
+  var toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  if (type === 'error') {
+    toast.style.background = '#f44336';
+  }
+  
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    document.body.removeChild(toast);
+  }, 2500);
+}
+
+// 设置拖拽上传
+function setupDragAndDrop() {
+  var uploadArea = document.getElementById('upload-area');
+  
+  uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+  
+  uploadArea.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+  });
+  
+  uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    
+    var files = e.dataTransfer.files;
+    handleFiles(files);
+  });
+}
+
+// 处理粘贴
+function handlePaste(e) {
+  var items = e.clipboardData.items;
+  var imageFiles = [];
+  
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    if (item.type.indexOf('image') !== -1) {
+      var file = item.getAsFile();
+      if (file) imageFiles.push(file);
+    }
+  }
+  
+  if (imageFiles.length > 0) {
+    e.preventDefault();
+    handleFiles(imageFiles);
+  }
+}
+
+// 处理文件选择
+function handleFileSelect(e) {
+  var files = e.target.files;
+  handleFiles(files);
+  // 清空input以便下次选择相同文件
+  e.target.value = '';
+}
+
+// 处理文件上传
+function handleFiles(files) {
+  for (var i = 0; i < files.length; i++) {
+    uploadImage(files[i]);
+  }
+}
+
+// 上传单张图片
+function uploadImage(file) {
+  var formData = new FormData();
+  formData.append('image', file);
+  
+  showToast('上传中...', 'info');
+  
+  fetch('/upload-image?name=' + encodeURIComponent(currentImageNoteName), {
+    method: 'POST',
+    body: formData
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(result) {
+    showToast('上传成功');
+    // 重新加载图片数据
+    loadImageData(currentImageNoteName);
+  })
+  .catch(function(err) {
+    console.error('Upload failed:', err);
+    showToast('上传失败', 'error');
+  });
+}
 </script>
 </body>
 </html>
