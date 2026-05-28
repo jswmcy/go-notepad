@@ -311,6 +311,9 @@ function insertLine(prefix) {
 
 // ========== 粘贴事件：MD 渲染 ==========
 document.getElementById('editor').addEventListener('paste', function(e) {
+  // 如果是图片模式，不拦截粘贴（让全局粘贴事件处理）
+  if (isImageMode()) return;
+  
   e.preventDefault();
   var text = e.clipboardData.getData('text/plain') || '';
   if (!text) return;
@@ -363,15 +366,22 @@ function checkHashMode() {
 // 切换模式
 function toggleMode() {
   var hash = window.location.hash;
-  var noteName = getNoteName();
   
   if (hash && hash.startsWith('#/')) {
-    // 当前是图片模式，切换到文本模式
+    // 当前是图片模式，切换到文本模式（从 hash 中取笔记本名）
+    var noteName = hash.substring(2);
     window.location.href = '/' + noteName;
   } else {
     // 当前是文本模式，切换到图片模式
-    window.location.href = '/#' + noteName;
+    var noteName = getNoteName();
+    window.location.href = '/#/' + noteName;
   }
+}
+
+// 判断当前是否是图片模式
+function isImageMode() {
+  var hash = window.location.hash;
+  return hash && hash.startsWith('#/');
 }
 
 // 显示图片模式
@@ -389,8 +399,12 @@ function showImageMode(noteName) {
   // 设置拖拽上传事件
   setupDragAndDrop();
   
-  // 设置粘贴事件
-  document.addEventListener('paste', handlePaste);
+  // 设置粘贴事件（只在图片模式下生效）
+  document.addEventListener('paste', function(e) {
+    if (isImageMode()) {
+      handlePaste(e);
+    }
+  });
 }
 
 // 加载图片数据
