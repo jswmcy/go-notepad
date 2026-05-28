@@ -141,8 +141,8 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 	
 	// 检查文件类型（从文件名判断扩展名，MIME 头不可靠）
-	filename := header.Filename
-	ext := strings.ToLower(filepath.Ext(filename))
+	originalFilename := header.Filename
+	ext := strings.ToLower(filepath.Ext(originalFilename))
 	allowedExts := map[string]string{
 		".png":  "png",
 		".jpg":  "jpg",

@@ -309,7 +309,7 @@ function insertLine(prefix) {
   doSave();
 }
 
-// ========== 粘贴事件：MD 渲染 ==========
+// ========== 粘贴事件：纯文本粘贴（保留原格式） ==========
 document.getElementById('editor').addEventListener('paste', function(e) {
   // 如果是图片模式，不拦截粘贴（让全局粘贴事件处理）
   if (isImageMode()) return;
@@ -318,19 +318,29 @@ document.getElementById('editor').addEventListener('paste', function(e) {
   var text = e.clipboardData.getData('text/plain') || '';
   if (!text) return;
 
-  // 将 MD 文本转为 HTML 后插入
+  // 判断是否为纯文本（不包含 Markdown 标记）
+  var isPlainText = !text.match(/(^|\s)(#{1,6}\s|[-*+]\s|>\s|\d+\.\s|```)/) && 
+                    (text.indexOf('**') === -1 && text.indexOf('__') === -1 && 
+                     text.indexOf('~~') === -1 && text.indexOf('`') === -1);
+  
   var sel = window.getSelection();
   if (sel.rangeCount > 0) {
     var range = sel.getRangeAt(0);
     range.deleteContents();
-    var div = document.createElement('div');
-    div.innerHTML = mdToHtml(text);
-
-    // 将渲染后的节点逐个插入
-    var frag = document.createDocumentFragment();
-    while (div.firstChild) frag.appendChild(div.firstChild);
-    range.insertNode(frag);
-
+    
+    if (isPlainText) {
+      // 纯文本直接插入
+      var textNode = document.createTextNode(text);
+      range.insertNode(textNode);
+    } else {
+      // 可能是 Markdown，尝试渲染
+      var div = document.createElement('div');
+      div.innerHTML = mdToHtml(text);
+      var frag = document.createDocumentFragment();
+      while (div.firstChild) frag.appendChild(div.firstChild);
+      range.insertNode(frag);
+    }
+    
     // 光标移到末尾
     range.collapse(false);
     sel.removeAllRanges();
