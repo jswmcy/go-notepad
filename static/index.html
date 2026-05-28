@@ -453,7 +453,7 @@ function createImageCard(filename) {
   
   var img = document.createElement('img');
   img.className = 'image-preview';
-  img.src = '/static/' + currentImageNoteName + '_images/' + filename;
+  img.src = '/data/' + currentImageNoteName + '_images/' + filename;
   img.alt = filename;
   img.loading = 'lazy';
   img.onclick = function() { showLightbox(img.src); };

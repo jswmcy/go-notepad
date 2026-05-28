@@ -40,7 +40,10 @@ func main() {
 	http.HandleFunc("/list-images", listImagesHandler)
 	http.HandleFunc("/meta", metaHandler)
 	
+	// 静态文件服务：static/ 目录
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	// 数据文件服务：data/ 目录（用于图片访问）
+	http.Handle("/data/", http.StripPrefix("/data/", http.FileServer(http.Dir("data"))))
 	fmt.Printf("go-notepad running on http://localhost%s\n", port)
 	http.ListenAndServe(port, nil)
 }
@@ -194,7 +197,7 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 	// 返回结果
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"path":     "/static/" + name + "_images/" + filename,
+		"path":     "/data/" + name + "_images/" + filename,
 		"filename": filename,
 	})
 }
